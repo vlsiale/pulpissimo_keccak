@@ -1,3 +1,10 @@
+//
+// keccak_top: keccak accelerator top-level. 
+// Designed by Alessandra Dolmeta, Mattia Mirigaldi
+// alessandra.dolmeta@polito.it, mattiamirigaldi.98017@gmail.com
+//
+
+
 `include "/register_interface/typedef.svh"
 `include "/register_interface/assign.svh"
 
@@ -67,39 +74,18 @@ module keccak_top
 
         
    // wiring signals between control unit and ip
-   wire logic [63:0] din_keccak, dout_keccak;
-   wire logic ready_keccak, dout_valid_keccak, start_keccak, last_block_keccak, din_valid_keccak;
-   
-        keccak_cu i_keccak_cu (
-		.clk_i(clk_i),
-		.rst_ni(rst_ni),
-		.start_i(reg_file_to_ip.ctrl.q & reg_file_to_ip.ctrl.qe),
-		.ready_keccak_i(ready_keccak),
-		.din_i(reg_file_to_ip.din),
-		.dout_keccak_i(dout_keccak),
-		.dout_valid_keccak_i(dout_valid_keccak),
-	        .start_keccak_o(start_keccak),
-		.last_block_keccak_o(last_block_keccak),
-		.dout_o(ip_to_reg_file.dout),
-		.din_keccak_o(din_keccak),
-		.din_valid_keccak_o(din_valid_keccak),
-		.status(ip_to_reg_file.status)	
-        );
-   
+   wire logic [1599:0] din_keccak, dout_keccak;
+   assign din_keccak = reg_file_to_ip.din;
 			       			        	
 	keccak i_keccak (
 		.clk(clk_i),
 		.rst_n(rst_ni),
-		.start(start_keccak),
+		.start(reg_file_to_ip.ctrl.q & reg_file_to_ip.ctrl.qe),
 		.din(din_keccak),
-		.din_valid(din_valid_keccak),
-		.buffer_full(),
-		.last_block(last_block_keccak),
-		.ready(ready_keccak),
 		.dout(dout_keccak),
-		.dout_valid(dout_valid_keccak)
+		.status(ip_to_reg_file.status)
 	);
 
-	assign ip_to_reg_file.dout = Dout_dummy;
-
+  assign ip_to_reg_file.dout = dout_keccak;
+  
 endmodule : keccak_top

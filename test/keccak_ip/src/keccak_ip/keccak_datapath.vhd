@@ -1,5 +1,5 @@
 -- The Keccak sponge function, designed by Guido Bertoni, Joan Daemen,
--- Micha�l Peeters and Gilles Van Assche. For more information, feedback or
+-- Michal Peeters and Gilles Van Assche. For more information, feedback or
 -- questions, please refer to our website: http://keccak.noekeon.org/
 
 -- Implementation by the designers,
@@ -8,6 +8,13 @@
 -- To the extent possible under law, the implementer has waived all copyright
 -- and related or neighboring rights to the source code in this file.
 -- http://creativecommons.org/publicdomain/zero/1.0/
+
+
+--
+-- keccak_datapath: datapath of keccak core.  
+-- Modified by Alessandra Dolmeta, Mattia Mirigaldi
+-- alessandra.dolmeta@polito.it, mattiamirigaldi.98017@gmail.com
+--
 
 library work;
 use work.keccak_globals.all;
@@ -18,23 +25,19 @@ use ieee.std_logic_arith.all;
 
 
 
-entity keccak is
+entity keccak_dp is
 
     port (
         clk     : in  std_logic;
         rst_n   : in  std_logic;
-        start : in std_logic;
-        din     : in  std_logic_vector(63 downto 0);
-        din_valid: in std_logic;
-        buffer_full: out std_logic;
-        last_block: in std_logic;
-        ready : out std_logic;
-        dout    : out std_logic_vector(63 downto 0);
-        dout_valid : out std_logic);
+        start_i : in std_logic; 
+        din     : in  std_logic_vector(1599 downto 0);
+        ready_o : out std_logic;
+        dout    : out std_logic_vector(1599 downto 0));
 
-end keccak;
+end keccak_dp;
 
-architecture rtl of keccak is
+architecture rtl of keccak_dp is
 
     --components
 
@@ -52,38 +55,19 @@ architecture rtl of keccak is
             round_number: in unsigned(4 downto 0);
             round_constant_signal_out: out std_logic_vector(7 downto 0));
     end component;
-
-
-    component keccak_buffer
-        port(
-            clk                   : in  std_logic;
-            rst_n                 : in  std_logic;
-            din_buffer_in         : in  std_logic_vector(63 downto 0);
-            din_buffer_in_valid   : in  std_logic;
-            last_block            : in  std_logic;
-            din_buffer_full       : out std_logic;
-            din_buffer_out        : out std_logic_vector(1599 downto 0);
-            dout_buffer_in        : in  std_logic_vector(1599 downto 0);
-            dout_buffer_out       : out std_logic_vector(63 downto 0);
-            dout_buffer_out_valid : out std_logic;
-            ready                 : in  std_logic
-        );
-    end component keccak_buffer;
-
-    ----------------------------------------------------------------------------
+ 
+   
     -- Internal signal declarations
     ----------------------------------------------------------------------------
 
 
     signal reg_data,round_in,round_out: k_state;
     --signal zero_state : k_state;
-    signal reg_data_vector: std_logic_vector (1599 downto 0);
     signal counter_nr_rounds : unsigned(4 downto 0);
     --signal zero_lane: k_lane;
-    signal din_buffer_full:std_logic;
     --signal zero_plane: k_plane;
     signal round_constant_signal: std_logic_vector(7 downto 0);
-    signal din_buffer_out: std_logic_vector(1599 downto 0);
+    signal compute_permutation : std_logic;
     signal permutation_computed : std_logic;
 
 
@@ -98,22 +82,7 @@ begin  -- Rtl
         );
 
     round_constants_gen: keccak_round_constants_gen port map(counter_nr_rounds,round_constant_signal);
-    buffer_in: keccak_buffer port map(
-            clk                   => clk,
-            rst_n                 => rst_n,
-            din_buffer_in         => din,
-            din_buffer_in_valid   => din_valid,
-            last_block            => last_block,
-            din_buffer_full       => din_buffer_full,
-            din_buffer_out        => din_buffer_out,
-            dout_buffer_in        => reg_data_vector,
-            dout_buffer_out       => dout,
-            dout_buffer_out_valid => dout_valid,
-            ready                 => permutation_computed
-        );
-
-
-
+    
     -- constants signals
     --zero_lane<= (others =>'0');
 
@@ -129,7 +98,7 @@ begin  -- Rtl
     i001: for y in 0 to 4 generate
         i002: for x in 0 to 4 generate
             i003: for i in 0 to 63 generate
-                reg_data_vector(320*y+64*x+i)<= reg_data(y)(x)(i);
+                dout(320*y+64*x+i) <= reg_data(y)(x)(i);
             end generate;
         end generate;
     end generate;
@@ -152,9 +121,10 @@ begin  -- Rtl
             end loop;
             counter_nr_rounds <= (others => '0');
             permutation_computed <='1';
+            compute_permutation <= '0';
         elsif clk'event and clk = '1' then  -- rising clk edge
 
-            if (start='1') then
+            if (start_i='1') then
                 --reg_data <= zero_state;
                 for row in 0 to 4 loop
                     for col in 0 to 4 loop
@@ -164,9 +134,10 @@ begin  -- Rtl
                     end loop;
                 end loop;
                 counter_nr_rounds <= (others => '0');
-                permutation_computed<='1';
+                compute_permutation<='1';
+                permutation_computed<= '1';
             else
-                if(din_buffer_full ='1' and permutation_computed='1') then
+                if(compute_permutation ='1' and permutation_computed='1') then
                     counter_nr_rounds(4 downto 0)<= (others => '0');
                     counter_nr_rounds(0)<='1';
                     permutation_computed<='0';
@@ -179,6 +150,7 @@ begin  -- Rtl
                     end if;
                     if( counter_nr_rounds = 23) then
                         permutation_computed<='1';
+                        compute_permutation<='0';
                         counter_nr_rounds<= (others => '0');
                     end if;
                 end if;
@@ -187,10 +159,6 @@ begin  -- Rtl
         end if;
     end process p_main;
 
-    --input mapping
-
-
-    --capacity part
 
 
     
@@ -198,14 +166,11 @@ begin  -- Rtl
     i10: for row in 0 to 4 generate
         i11: for col in 0 to 4 generate
             i12: for i in 0 to 63 generate
-                round_in(row)(col)(i)<= reg_data(row)(col)(i) xor (din_buffer_out((row*64*5)+(col*64)+i) and (din_buffer_full and permutation_computed));
+                round_in(row)(col)(i)<= reg_data(row)(col)(i) xor (din((row*64*5)+(col*64)+i) and permutation_computed);
             end generate;
         end generate;
     end generate;
 
+    ready_o<=permutation_computed;
 
-
-
-    ready<=permutation_computed;
-    buffer_full<=din_buffer_full;
 end rtl;

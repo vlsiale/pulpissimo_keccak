@@ -15,7 +15,7 @@ make clean build
 cd ../test/keccak_ip
 make clean all
 make dis > keccak.s
-make -f Makefile run gui=1
+make -f Makefile run
 
 
 

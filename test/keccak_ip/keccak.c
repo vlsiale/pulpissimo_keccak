@@ -20,6 +20,7 @@ int main(){
     
 	KeccakF1600_StatePermute(Din, Dout);
 	
+  printf("Keccak Ends!\n");
 	return 0;
 
 }
