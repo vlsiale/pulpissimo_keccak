@@ -4,3 +4,6 @@
 [submodule "pulp-runtime"]
 	path = pulp-runtime
 	url = vlsiale:vlsiale/pulp-runtime.git
+[submodule "pulp_soc"]
+	path = pulp_soc
+	url = vlsiale:vlsiale/pulp_soc.git
